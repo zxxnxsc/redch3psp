@@ -1,0 +1,121 @@
+TARGET := gta3_psp_re3
+.DEFAULT_GOAL := eboot
+
+include common.mk
+
+PSPDEV ?= /usr/local/pspdev
+PSPSDK := $(shell PATH=$(PSPDEV)/bin:$$PATH psp-config --pspsdk-path)
+CXX := $(PSPDEV)/bin/psp-g++
+CC := $(PSPDEV)/bin/psp-gcc
+
+# Compile the complete GTA III engine. Platform-specific Dreamcast services are
+# replaced by PSP units as they land; they are deliberately excluded here so
+# this target measures the portable engine itself, not the old viewer.
+PSP_RE3_INPUTS := $(filter-out \
+	../src/liberty/core/CdStreamDC.o \
+	../src/liberty/skel/dc/dc.o \
+	../src/liberty/audio/sampman_miles.o \
+	../src/liberty/audio/sampman_oal.o \
+	../src/common/vmu/vmu.o \
+	../src/common/thread/thread.o, \
+	$(RE3_OBJS))
+
+PSP_RW_INPUTS := \
+	../vendor/librw/src/anim.o \
+	../vendor/librw/src/base.o \
+	../vendor/librw/src/camera.o \
+	../vendor/librw/src/charset.o \
+	../vendor/librw/src/clump.o \
+	../vendor/librw/src/engine.o \
+	../vendor/librw/src/error.o \
+	../vendor/librw/src/frame.o \
+	../vendor/librw/src/geometry.o \
+	../vendor/librw/src/geoplg.o \
+	../vendor/librw/src/hanim.o \
+	../vendor/librw/src/image.o \
+	../vendor/librw/src/light.o \
+	../vendor/librw/src/matfx.o \
+	../vendor/librw/src/pipeline.o \
+	../vendor/librw/src/plg.o \
+	../vendor/librw/src/prim.o \
+	../vendor/librw/src/raster.o \
+	../vendor/librw/src/render.o \
+	../vendor/librw/src/skin.o \
+	../vendor/librw/src/texture.o \
+	../vendor/librw/src/tristrip.o \
+	../vendor/librw/src/userdata.o \
+	../vendor/librw/src/uvanim.o \
+	../vendor/librw/src/world.o \
+	../vendor/librw/src/psp/psp.o
+
+PSP_PLATFORM_INPUTS := \
+	../src/liberty/core/AnimViewer.o \
+	../src/liberty/skel/psp/psp.o \
+	../src/liberty/core/CdStreamPsp.o \
+	../src/liberty/audio/sampman_psp.o
+
+PSP_RE3_OBJS := $(patsubst ../%.o,build-psp/%.o,$(PSP_RE3_INPUTS))
+PSP_RW_OBJS := $(patsubst ../%.o,build-psp/%.o,$(PSP_RW_INPUTS))
+PSP_PLATFORM_OBJS := $(patsubst ../%.o,build-psp/%.o,$(PSP_PLATFORM_INPUTS))
+PSP_ENGINE_OBJS := $(PSP_RE3_OBJS) $(PSP_RW_OBJS) $(PSP_PLATFORM_OBJS)
+
+PSP_INCLUDES := -I../src/liberty/skel/psp/compat \
+	$(filter-out -I../vendor/librw/src/dc,$(INCLUDE)) \
+	-I../vendor/librw/src/dc -I../vendor/librw/src/psp -I$(PSPSDK)/include
+PSP_DEFINES := -DRW_PSP -DLIBRW -DRW_DC_SLOW -DNDEBUG
+PSP_WARNINGS := -Wno-sign-compare -Wno-parentheses -Wno-maybe-uninitialized \
+	-Wno-format -Wno-strict-aliasing -Wno-unused-variable \
+	-Wno-unused-but-set-variable -Wno-write-strings \
+	-Wno-deprecated-enum-enum-conversion -Wno-deprecated-enum-float-conversion \
+	-Wno-multichar -Wno-unused-value -Wno-char-subscripts -Wno-reorder \
+	-Wno-unused-function -Wno-class-memaccess
+PSP_CXXFLAGS := -std=gnu++20 -Os -G0 -ffast-math -fomit-frame-pointer \
+	-ffunction-sections -fdata-sections -fno-exceptions -fno-rtti \
+	-fno-sized-deallocation -fpermissive $(PSP_WARNINGS) $(PSP_INCLUDES) $(PSP_DEFINES)
+
+PSP_LINK_FLAGS := -G0 -Wl,-zmax-page-size=128 \
+	-L$(PSPDEV)/psp/lib -L$(PSPSDK)/lib
+PSP_LIBS := -lpsprtc -lpspgum -lpspgu -lpspaudio -lpspdebug -lpspdisplay -lpspge -lpspctrl -lm
+PSP_TITLE := GTA III PSP re3 Full Engine 10C STABLE INDEXED
+PSP_PACKAGE := build-psp/package/GTA3PSP
+
+.PHONY: eboot psp-engine compile-status clean-psp
+
+eboot: $(PSP_PACKAGE)/EBOOT.PBP
+
+psp-engine: git-version/git-version.h $(PSP_ENGINE_OBJS)
+	@echo "PSP full-engine objects compiled: $(words $(PSP_ENGINE_OBJS))"
+
+build-psp/$(TARGET).elf: git-version/git-version.h $(PSP_ENGINE_OBJS)
+	$(CXX) $(PSP_LINK_FLAGS) $(PSP_ENGINE_OBJS) $(PSP_LIBS) -o $@
+	$(PSPDEV)/bin/psp-fixup-imports $@
+
+build-psp/$(TARGET)_strip.elf: build-psp/$(TARGET).elf
+	$(PSPDEV)/bin/psp-strip $< -o $@
+
+build-psp/PARAM.SFO: Makefile.psp
+	@mkdir -p $(@D)
+	$(PSPDEV)/bin/mksfoex -d MEMSIZE=2 '$(PSP_TITLE)' $@
+
+$(PSP_PACKAGE)/EBOOT.PBP: build-psp/$(TARGET)_strip.elf build-psp/PARAM.SFO
+	@mkdir -p $(@D)
+	$(PSPDEV)/bin/pack-pbp $@ build-psp/PARAM.SFO NULL NULL NULL NULL NULL $< NULL
+	@echo "Built $@"
+
+compile-status:
+	@echo "GTA III engine objects: $(words $(PSP_RE3_OBJS))"
+	@echo "librw PSP objects: $(words $(PSP_RW_OBJS))"
+	@echo "total: $(words $(PSP_ENGINE_OBJS))"
+
+build-psp/%.o: ../%.cpp
+	@mkdir -p $(@D)
+	$(CXX) $(PSP_CXXFLAGS) -MMD -MP -c $< -o $@
+
+build-psp/%.o: ../%.c
+	@mkdir -p $(@D)
+	$(CC) -Os -G0 $(PSP_INCLUDES) $(PSP_DEFINES) -MMD -MP -c $< -o $@
+
+clean-psp:
+	rm -rf build-psp
+
+-include $(PSP_ENGINE_OBJS:.o=.d)
