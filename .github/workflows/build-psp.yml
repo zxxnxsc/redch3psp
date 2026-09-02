@@ -1,0 +1,55 @@
+name: build-psp
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ psp-engine-10a ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: pspdev/pspdev:latest
+    steps:
+      - name: Checkout reconstruction repo
+        uses: actions/checkout@v4
+
+      - name: Install host helpers inside PSPDEV image
+        shell: bash
+        run: |
+          set -euxo pipefail
+          apk add --no-cache python3
+
+      - name: Show PSP toolchain
+        shell: bash
+        run: |
+          set -euxo pipefail
+          psp-config --pspsdk-path
+          psp-g++ --version
+          python3 --version
+          git --version
+
+      - name: Reconstruct pinned upstream tree
+        shell: bash
+        run: |
+          set -euxo pipefail
+          bash tools/bootstrap-upstream.sh
+
+      - name: Build GTA III PSP EBOOT
+        shell: bash
+        run: |
+          set -euxo pipefail
+          make -f platform/psp/Makefile ROOT="$GITHUB_WORKSPACE" SOURCE_TREE="$GITHUB_WORKSPACE/work/re3" -j2
+          test -s build/psp10a/EBOOT.PBP
+          ls -lh build/psp10a/EBOOT.PBP
+
+      - name: Upload EBOOT
+        uses: actions/upload-artifact@v4
+        with:
+          name: gta3-psp-10a
+          path: |
+            build/psp10a/EBOOT.PBP
+            build/psp10a/GTA3PSP.map
+          if-no-files-found: error
