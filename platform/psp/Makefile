@@ -18,7 +18,8 @@ APP_CPP := $(shell find "$(SOURCE_TREE)/src" -type f -name '*.cpp' \
 	! -name 'sampman_oal.cpp')
 
 RW_CPP := $(shell find "$(SOURCE_TREE)/vendor/librw/src" -maxdepth 1 -type f -name '*.cpp') \
-	$(SOURCE_TREE)/vendor/librw/src/lodepng/lodepng.cpp
+	$(SOURCE_TREE)/vendor/librw/src/lodepng/lodepng.cpp \
+	$(SOURCE_TREE)/vendor/librw/src/psp/psp.cpp
 
 APP_OBJS := $(patsubst $(SOURCE_TREE)/%.cpp,$(BUILD_DIR)/upstream/%.o,$(APP_CPP))
 RW_OBJS  := $(patsubst $(SOURCE_TREE)/%.cpp,$(BUILD_DIR)/upstream/%.o,$(RW_CPP))
@@ -32,9 +33,10 @@ SRC_INC_DIRS := src src/animation src/audio src/buildings src/collision src/cont
 INCDIRS := $(foreach d,$(SRC_INC_DIRS),-I$(SOURCE_TREE)/$(d)) \
 	-I$(SOURCE_TREE)/vendor/librw \
 	-I$(SOURCE_TREE)/vendor/librw/src \
+	-I$(SOURCE_TREE)/vendor/librw/src/psp \
 	-I$(ROOT)/platform/psp
 
-DEFINES := -DPSP -DPSP_PORT -DLIBRW -DMASTER -DFINAL -DFIX_BUGS -DNO_MOVIES \
+DEFINES := -DPSP -DPSP_PORT -DRW_PSP -DLIBRW -DMASTER -DFINAL -DFIX_BUGS -DNO_MOVIES \
 	-DDEFAULT_SCREEN_WIDTH=480 -DDEFAULT_SCREEN_HEIGHT=272
 
 CFLAGS := -O2 -G0 -Wall -Wno-unused-parameter -Wno-unused-variable \
