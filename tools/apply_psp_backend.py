@@ -85,4 +85,20 @@ patch(
     'controller: select PSP joy state',
 )
 
+# GCC for the PSP target treats the table fields as a different integral type
+# from re3's int32 typedef. Make the intended integer overload explicit.
+pedchat = root / 'src' / 'peds' / 'PedChat.cpp'
+patch(
+    pedchat,
+    'CGeneral::GetRandomNumberInRange(0, CommentWaitTime[m_queuedSound - SOUND_PED_DEATH].m_nOverrideFixedDelayTime)',
+    'CGeneral::GetRandomNumberInRange((int32)0, (int32)CommentWaitTime[m_queuedSound - SOUND_PED_DEATH].m_nOverrideFixedDelayTime)',
+    'ped chat: disambiguate fixed-delay RNG',
+)
+patch(
+    pedchat,
+    'CGeneral::GetRandomNumberInRange(0, CommentWaitTime[audio - SOUND_PED_DEATH].m_nMaxRandomDelayTime)',
+    'CGeneral::GetRandomNumberInRange((int32)0, (int32)CommentWaitTime[audio - SOUND_PED_DEATH].m_nMaxRandomDelayTime)',
+    'ped chat: disambiguate max-delay RNG',
+)
+
 print('[redch3psp] PSP backend injected')
