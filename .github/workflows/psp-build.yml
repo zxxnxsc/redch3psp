@@ -69,7 +69,7 @@ jobs:
       - name: Checkout redch3psp
         uses: actions/checkout@v4
 
-      - name: Apply reconstruction patches
+      - name: Reconstruct source tree
         shell: bash
         run: |
           set -euxo pipefail
@@ -77,6 +77,20 @@ jobs:
           tools/bootstrap-upstream.sh
           test -f work/re3/src/animation/CutsceneMgr.cpp
           grep -q 'PSP AUD 130' work/re3/src/animation/CutsceneMgr.cpp
+
+      - name: Pack reconstructed source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          tar -C work -czf reconstructed-re3.tar.gz re3
+
+      - name: Upload reconstructed source
+        uses: actions/upload-artifact@v4
+        with:
+          name: REDCH3PSP-RECONSTRUCTED-SOURCE
+          path: reconstructed-re3.tar.gz
+          if-no-files-found: error
+          retention-days: 7
 
   game-build:
     name: GTA III PSP game EBOOT
@@ -90,12 +104,20 @@ jobs:
       - name: Checkout redch3psp
         uses: actions/checkout@v4
 
-      - name: Reconstruct upstream source
+      - name: Download reconstructed source
+        uses: actions/download-artifact@v4
+        with:
+          name: REDCH3PSP-RECONSTRUCTED-SOURCE
+          path: .ci-source
+
+      - name: Restore reconstructed source
         shell: bash
         run: |
           set -euxo pipefail
-          chmod +x tools/bootstrap-upstream.sh
-          tools/bootstrap-upstream.sh
+          mkdir -p work
+          tar -C work -xzf .ci-source/reconstructed-re3.tar.gz
+          test -f work/re3/src/animation/CutsceneMgr.cpp
+          grep -q 'PSP AUD 130' work/re3/src/animation/CutsceneMgr.cpp
 
       - name: Build GTA III PSP when engine target is present
         id: game
@@ -110,7 +132,7 @@ jobs:
             make -f Makefile.psp -j2 SOURCE_TREE="$PWD/work/re3"
           else
             echo 'game_ready=false' >> "$GITHUB_OUTPUT"
-            echo 'The PSPSDK pipeline is working, but the recovered full-engine PSP Makefile/source has not been reconstructed into this repository yet.'
+            echo 'PSPSDK and reconstructed source are ready. Missing full-engine PSP Makefile/backend target.'
             exit 0
           fi
 
