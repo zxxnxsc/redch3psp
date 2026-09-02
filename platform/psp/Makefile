@@ -1,6 +1,8 @@
 # redch3psp full-engine PSP reconstruction target
 # Invoked from repository root by GitHub Actions.
 
+.DEFAULT_GOAL := all
+
 ROOT ?= $(CURDIR)
 SOURCE_TREE ?= $(ROOT)/work/re3
 BUILD_DIR := $(ROOT)/build/psp10a
