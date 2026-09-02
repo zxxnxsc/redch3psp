@@ -16,6 +16,12 @@ jobs:
       - name: Checkout reconstruction repo
         uses: actions/checkout@v4
 
+      - name: Install host helpers inside PSPDEV image
+        shell: bash
+        run: |
+          set -euxo pipefail
+          apk add --no-cache python3
+
       - name: Show PSP toolchain
         shell: bash
         run: |
