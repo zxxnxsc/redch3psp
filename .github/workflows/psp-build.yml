@@ -1,0 +1,145 @@
+name: PSP EBOOT build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - 'fix/**'
+    paths:
+      - '.github/workflows/psp-build.yml'
+      - 'ci/**'
+      - 'platform/psp/**'
+      - 'src/**'
+      - 'vendor/**'
+      - 'patches/**'
+      - 'tools/**'
+  pull_request:
+    paths:
+      - '.github/workflows/psp-build.yml'
+      - 'ci/**'
+      - 'platform/psp/**'
+      - 'src/**'
+      - 'vendor/**'
+      - 'patches/**'
+      - 'tools/**'
+
+permissions:
+  contents: read
+
+jobs:
+  toolchain-smoke:
+    name: PSPSDK / EBOOT packaging
+    runs-on: ubuntu-latest
+    container:
+      image: pspdev/pspdev:latest
+    steps:
+      - name: Checkout redch3psp
+        uses: actions/checkout@v4
+
+      - name: Show PSP toolchain
+        shell: bash
+        run: |
+          set -euxo pipefail
+          psp-gcc --version
+          psp-config --pspsdk-path
+
+      - name: Build packaging smoke EBOOT
+        shell: bash
+        run: |
+          set -euxo pipefail
+          make -C ci/psp-smoke clean || true
+          make -C ci/psp-smoke -j2
+          test -s ci/psp-smoke/EBOOT.PBP
+          mkdir -p artifacts/TOOLCHAIN_TEST
+          cp ci/psp-smoke/EBOOT.PBP artifacts/TOOLCHAIN_TEST/EBOOT.PBP
+
+      - name: Upload PSPSDK test EBOOT
+        uses: actions/upload-artifact@v4
+        with:
+          name: REDCH3PSP-PSPSDK-TOOLCHAIN-TEST
+          path: artifacts/TOOLCHAIN_TEST/EBOOT.PBP
+          if-no-files-found: error
+          retention-days: 14
+
+  reconstructed-source:
+    name: Reconstruct pinned upstream + patches
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout redch3psp
+        uses: actions/checkout@v4
+
+      - name: Apply reconstruction patches
+        shell: bash
+        run: |
+          set -euxo pipefail
+          chmod +x tools/bootstrap-upstream.sh
+          tools/bootstrap-upstream.sh
+          test -f work/re3/src/animation/CutsceneMgr.cpp
+          grep -q 'PSP AUD 130' work/re3/src/animation/CutsceneMgr.cpp
+
+  game-build:
+    name: GTA III PSP game EBOOT
+    needs:
+      - toolchain-smoke
+      - reconstructed-source
+    runs-on: ubuntu-latest
+    container:
+      image: pspdev/pspdev:latest
+    steps:
+      - name: Checkout redch3psp
+        uses: actions/checkout@v4
+
+      - name: Reconstruct upstream source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          chmod +x tools/bootstrap-upstream.sh
+          tools/bootstrap-upstream.sh
+
+      - name: Build GTA III PSP when engine target is present
+        id: game
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p artifacts/GTA3PSP
+
+          if [ -f platform/psp/Makefile ]; then
+            make -f platform/psp/Makefile -j2 ROOT="$PWD" SOURCE_TREE="$PWD/work/re3"
+          elif [ -f Makefile.psp ]; then
+            make -f Makefile.psp -j2 SOURCE_TREE="$PWD/work/re3"
+          else
+            echo 'game_ready=false' >> "$GITHUB_OUTPUT"
+            echo 'The PSPSDK pipeline is working, but the recovered full-engine PSP Makefile/source has not been reconstructed into this repository yet.'
+            exit 0
+          fi
+
+          EBOOT="$(find . -type f -name EBOOT.PBP -not -path './ci/psp-smoke/*' -print -quit)"
+          if [ -z "$EBOOT" ]; then
+            echo 'Game build target ran but did not produce EBOOT.PBP' >&2
+            exit 1
+          fi
+
+          cp "$EBOOT" artifacts/GTA3PSP/EBOOT.PBP
+          test -s artifacts/GTA3PSP/EBOOT.PBP
+          echo 'game_ready=true' >> "$GITHUB_OUTPUT"
+
+      - name: Write build information
+        if: steps.game.outputs.game_ready == 'true'
+        shell: bash
+        run: |
+          {
+            echo 'REDCH3PSP automatic PSP build'
+            echo "commit=$GITHUB_SHA"
+            echo "ref=$GITHUB_REF"
+            echo 'test target: PSP/GAME/GTA3PSP/EBOOT.PBP'
+          } > artifacts/GTA3PSP/BUILD_INFO.txt
+
+      - name: Upload GTA III PSP EBOOT
+        if: steps.game.outputs.game_ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: GTA3-PSP-EBOOT-${{ github.sha }}
+          path: artifacts/GTA3PSP/
+          if-no-files-found: error
+          retention-days: 30
