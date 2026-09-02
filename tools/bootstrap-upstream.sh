@@ -13,13 +13,8 @@ echo "[redch3psp] cloning pinned re3 upstream"
 git clone --quiet "$UPSTREAM" "$WORK"
 git -C "$WORK" checkout --quiet "$UPSTREAM_COMMIT"
 
-for patch in "$ROOT"/patches/*.patch; do
-  [ -e "$patch" ] || continue
-  echo "[redch3psp] checking $(basename "$patch")"
-  git -C "$WORK" apply --check "$patch"
-  echo "[redch3psp] applying $(basename "$patch")"
-  git -C "$WORK" apply "$patch"
-done
+echo "[redch3psp] applying deterministic reconstruction edits"
+python3 "$ROOT/tools/apply_reconstruction.py" "$WORK"
 
 echo "[redch3psp] reconstruction tree ready: $WORK"
 echo "[redch3psp] upstream commit: $UPSTREAM_COMMIT"
