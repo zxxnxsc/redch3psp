@@ -1,0 +1,108 @@
+diff --git a/src/animation/CutsceneMgr.cpp b/src/animation/CutsceneMgr.cpp
+index 83c4dbc..1111111 100644
+--- a/src/animation/CutsceneMgr.cpp
++++ b/src/animation/CutsceneMgr.cpp
+@@ -174,6 +174,8 @@ CCutsceneMgr::LoadCutsceneData(const char *szCutsceneName)
+ 	CPlayerPed *pPlayerPed;
+ 
++	printf("PSP CUT 120 load begin name=%s\n", szCutsceneName ? szCutsceneName : "<null>");
++
+ 	ms_cutsceneProcessing = true;
+ 	if (!strcasecmp(szCutsceneName, "jb"))
+ 		ms_useLodMultiplier = true;
+@@ -195,6 +197,7 @@ CCutsceneMgr::LoadCutsceneData(const char *szCutsceneName)
+ 		CStreaming::IHaveUsedStreamingMemory();
+ 		ms_animLoaded = true;
++		printf("PSP CUT 121 anim loaded name=%s size=%u\n", szCutsceneName, size);
+ 	} else {
+ 		ms_animLoaded = false;
++		printf("PSP CUT 121E anim missing name=%s\n", szCutsceneName);
+ 	}
+@@ -204,6 +207,7 @@ CCutsceneMgr::LoadCutsceneData(const char *szCutsceneName)
+ 		CFileMgr::Seek(file, offset << 11, SEEK_SET);
+ 		TheCamera.LoadPathSplines(file);
++		printf("PSP CUT 122 camera loaded name=%s size=%u\n", szCutsceneName, size);
+ 	}
+ 
+ 	CFileMgr::CloseFile(file);
+@@ -212,11 +216,14 @@ CCutsceneMgr::LoadCutsceneData(const char *szCutsceneName)
+ 		DMAudio.ChangeMusicMode(MUSICMODE_CUTSCENE);
+ 		int trackId = FindCutsceneAudioTrackId(szCutsceneName);
++		printf("PSP AUD 130 cutscene=%s track=%d\n", szCutsceneName, trackId);
+ 		if (trackId != -1) {
+-			printf("Start preload audio %s\n", szCutsceneName);
++			printf("PSP AUD 131 preload begin track=%d\n", trackId);
+ 			DMAudio.PreloadCutSceneMusic(trackId);
+-			printf("End preload audio %s\n", szCutsceneName);
++			printf("PSP AUD 132 preload returned track=%d\n", trackId);
++		} else {
++			printf("PSP AUD 130E no mapped cutscene track\n");
+ 		}
+ 	}
+@@ -250,19 +257,41 @@ CCutsceneMgr::SetupCutsceneToStart(void)
+ 	TheCamera.SetWideScreenOn();
+ 
+ 	ms_cutsceneOffset.z++;
++	printf("PSP CUT 140 setup begin objects=%d\n", ms_numCutsceneObjs);
+ 
+ 	for (int i = ms_numCutsceneObjs - 1; i >= 0; i--) {
+-		assert(RwObjectGetType(ms_pCutsceneObjects[i]->m_rwObject) == rpCLUMP);
+-		if (CAnimBlendAssociation *pAnimBlendAssoc = RpAnimBlendClumpGetFirstAssociation((RpClump*)ms_pCutsceneObjects[i]->m_rwObject)) {
+-			assert(pAnimBlendAssoc->hierarchy->sequences[0].HasTranslation());
+-			ms_pCutsceneObjects[i]->SetPosition(ms_cutsceneOffset + ((KeyFrameTrans*)pAnimBlendAssoc->hierarchy->sequences[0].GetKeyFrame(0))->translation);
+-			CWorld::Add(ms_pCutsceneObjects[i]);
++		CCutsceneObject *obj = ms_pCutsceneObjects[i];
++		if (obj == nil || obj->m_rwObject == nil) {
++			printf("PSP CUT 141E null object slot=%d\n", i);
++			continue;
++		}
++		if (RwObjectGetType(obj->m_rwObject) != rpCLUMP) {
++			printf("PSP CUT 142E non-clump slot=%d type=%d\n", i, RwObjectGetType(obj->m_rwObject));
++			continue;
++		}
++
++		CAnimBlendAssociation *pAnimBlendAssoc = RpAnimBlendClumpGetFirstAssociation((RpClump*)obj->m_rwObject);
++		if (pAnimBlendAssoc) {
++			if (pAnimBlendAssoc->hierarchy == nil || pAnimBlendAssoc->hierarchy->sequences == nil) {
++				printf("PSP CUT 143E bad hierarchy slot=%d\n", i);
++				continue;
++			}
++			if (pAnimBlendAssoc->hierarchy->sequences[0].HasTranslation()) {
++				KeyFrameTrans *firstFrame = (KeyFrameTrans*)pAnimBlendAssoc->hierarchy->sequences[0].GetKeyFrame(0);
++				if (firstFrame == nil) {
++					printf("PSP CUT 144E null first keyframe slot=%d\n", i);
++					continue;
++				}
++				obj->SetPosition(ms_cutsceneOffset + firstFrame->translation);
++			} else {
++				printf("PSP CUT 144W no translation slot=%d\n", i);
++				obj->SetPosition(ms_cutsceneOffset);
++			}
++			CWorld::Add(obj);
+ 			pAnimBlendAssoc->SetRun();
+ 		} else {
+-			ms_pCutsceneObjects[i]->SetPosition(ms_cutsceneOffset);
++			obj->SetPosition(ms_cutsceneOffset);
+ 		}
++		printf("PSP CUT 145 object ready slot=%d\n", i);
+ 	}
+ 
+ 	CTimer::Update();
+ 	CTimer::Update();
+ 	ms_running = true;
+ 	ms_cutsceneTimer = 0.0f;
++	printf("PSP CUT 146 setup complete\n");
+ }
+@@ -394,9 +416,13 @@ CCutsceneMgr::Update(void)
+ 	switch (ms_cutsceneLoadStatus) {
+ 	case CUTSCENE_LOADING_AUDIO:
++		printf("PSP CUT 150 loading-audio state name=%s\n", ms_cutsceneName);
+ 		SetupCutsceneToStart();
+-		if (CGeneral::faststricmp(ms_cutsceneName, "end"))
++		if (CGeneral::faststricmp(ms_cutsceneName, "end")) {
++			printf("PSP AUD 151 play preloaded begin\n");
+ 			DMAudio.PlayPreloadedCutSceneMusic();
++			printf("PSP AUD 152 play preloaded returned\n");
++		}
+ 		ms_cutsceneLoadStatus++;
+ 		break;
