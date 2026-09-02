@@ -39,7 +39,7 @@ index 83c4dbc..1111111 100644
 +			printf("PSP AUD 130E no mapped cutscene track\n");
  		}
  	}
-@@ -250,19 +257,34 @@ CCutsceneMgr::SetupCutsceneToStart(void)
+@@ -250,19 +257,41 @@ CCutsceneMgr::SetupCutsceneToStart(void)
  	TheCamera.SetWideScreenOn();
  
  	ms_cutsceneOffset.z++;
@@ -49,6 +49,8 @@ index 83c4dbc..1111111 100644
 -		assert(RwObjectGetType(ms_pCutsceneObjects[i]->m_rwObject) == rpCLUMP);
 -		if (CAnimBlendAssociation *pAnimBlendAssoc = RpAnimBlendClumpGetFirstAssociation((RpClump*)ms_pCutsceneObjects[i]->m_rwObject)) {
 -			assert(pAnimBlendAssoc->hierarchy->sequences[0].HasTranslation());
+-			ms_pCutsceneObjects[i]->SetPosition(ms_cutsceneOffset + ((KeyFrameTrans*)pAnimBlendAssoc->hierarchy->sequences[0].GetKeyFrame(0))->translation);
+-			CWorld::Add(ms_pCutsceneObjects[i]);
 +		CCutsceneObject *obj = ms_pCutsceneObjects[i];
 +		if (obj == nil || obj->m_rwObject == nil) {
 +			printf("PSP CUT 141E null object slot=%d\n", i);
@@ -62,16 +64,25 @@ index 83c4dbc..1111111 100644
 +		CAnimBlendAssociation *pAnimBlendAssoc = RpAnimBlendClumpGetFirstAssociation((RpClump*)obj->m_rwObject);
 +		if (pAnimBlendAssoc) {
 +			if (pAnimBlendAssoc->hierarchy == nil || pAnimBlendAssoc->hierarchy->sequences == nil) {
-+				printf("PSP CUT 143E bad hierarchy slot=%d assoc=%p hierarchy=%p\n", i, pAnimBlendAssoc, pAnimBlendAssoc->hierarchy);
++				printf("PSP CUT 143E bad hierarchy slot=%d\n", i);
 +				continue;
 +			}
-+			if (!pAnimBlendAssoc->hierarchy->sequences[0].HasTranslation())
++			if (pAnimBlendAssoc->hierarchy->sequences[0].HasTranslation()) {
++				KeyFrameTrans *firstFrame = (KeyFrameTrans*)pAnimBlendAssoc->hierarchy->sequences[0].GetKeyFrame(0);
++				if (firstFrame == nil) {
++					printf("PSP CUT 144E null first keyframe slot=%d\n", i);
++					continue;
++				}
++				obj->SetPosition(ms_cutsceneOffset + firstFrame->translation);
++			} else {
 +				printf("PSP CUT 144W no translation slot=%d\n", i);
- 			ms_pCutsceneObjects[i]->SetPosition(ms_cutsceneOffset + ((KeyFrameTrans*)pAnimBlendAssoc->hierarchy->sequences[0].GetKeyFrame(0))->translation);
- 			CWorld::Add(ms_pCutsceneObjects[i]);
++				obj->SetPosition(ms_cutsceneOffset);
++			}
++			CWorld::Add(obj);
  			pAnimBlendAssoc->SetRun();
  		} else {
- 			ms_pCutsceneObjects[i]->SetPosition(ms_cutsceneOffset);
+-			ms_pCutsceneObjects[i]->SetPosition(ms_cutsceneOffset);
++			obj->SetPosition(ms_cutsceneOffset);
  		}
 +		printf("PSP CUT 145 object ready slot=%d\n", i);
  	}
