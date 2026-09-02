@@ -85,31 +85,8 @@ patch(
     'controller: select PSP joy state',
 )
 
-# PSPSDK's stdint.h maps int32_t to long while plain integer literals are int.
-# re3 overloads RNG for float and int32, so an `int` literal becomes ambiguous.
-# Give PSP an exact int overload; int32/long callers retain the original overload.
-general = root / 'src' / 'core' / 'General.h'
-patch(
-    general,
-    '\tstatic int32 GetRandomNumberInRange(int32 low, int32 high)\n\t\t{ return low + (high - low)*(GetRandomNumber()/float(MYRAND_MAX + 1)); }\n',
-    '\tstatic int32 GetRandomNumberInRange(int32 low, int32 high)\n\t\t{ return low + (high - low)*(GetRandomNumber()/float(MYRAND_MAX + 1)); }\n#ifdef PSP\n\tstatic int GetRandomNumberInRange(int low, int high)\n\t\t{ return low + (high - low)*(GetRandomNumber()/float(MYRAND_MAX + 1)); }\n#endif\n',
-    'general: add PSP exact-int RNG overload',
-)
-
-# Table members used by ped speech have yet another integral width; keep these
-# two calls explicitly on the int32 overload as well.
-pedchat = root / 'src' / 'peds' / 'PedChat.cpp'
-patch(
-    pedchat,
-    'CGeneral::GetRandomNumberInRange(0, CommentWaitTime[m_queuedSound - SOUND_PED_DEATH].m_nOverrideFixedDelayTime)',
-    'CGeneral::GetRandomNumberInRange((int32)0, (int32)CommentWaitTime[m_queuedSound - SOUND_PED_DEATH].m_nOverrideFixedDelayTime)',
-    'ped chat: disambiguate fixed-delay RNG',
-)
-patch(
-    pedchat,
-    'CGeneral::GetRandomNumberInRange(0, CommentWaitTime[audio - SOUND_PED_DEATH].m_nMaxRandomDelayTime)',
-    'CGeneral::GetRandomNumberInRange((int32)0, (int32)CommentWaitTime[audio - SOUND_PED_DEATH].m_nMaxRandomDelayTime)',
-    'ped chat: disambiguate max-delay RNG',
-)
+# PSP reconstruction now aliases int32/uint32 to int/unsigned int in common.h.
+# That makes the original int32 RNG overload exactly match plain int callers,
+# so do not inject the older extra int overload here (it would be a duplicate).
 
 print('[redch3psp] PSP backend injected')
