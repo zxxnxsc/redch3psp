@@ -85,8 +85,19 @@ patch(
     'controller: select PSP joy state',
 )
 
-# GCC for the PSP target treats the table fields as a different integral type
-# from re3's int32 typedef. Make the intended integer overload explicit.
+# PSPSDK's stdint.h maps int32_t to long while plain integer literals are int.
+# re3 overloads RNG for float and int32, so an `int` literal becomes ambiguous.
+# Give PSP an exact int overload; int32/long callers retain the original overload.
+general = root / 'src' / 'core' / 'General.h'
+patch(
+    general,
+    '\tstatic int32 GetRandomNumberInRange(int32 low, int32 high)\n\t\t{ return low + (high - low)*(GetRandomNumber()/float(MYRAND_MAX + 1)); }\n',
+    '\tstatic int32 GetRandomNumberInRange(int32 low, int32 high)\n\t\t{ return low + (high - low)*(GetRandomNumber()/float(MYRAND_MAX + 1)); }\n#ifdef PSP\n\tstatic int GetRandomNumberInRange(int low, int high)\n\t\t{ return low + (high - low)*(GetRandomNumber()/float(MYRAND_MAX + 1)); }\n#endif\n',
+    'general: add PSP exact-int RNG overload',
+)
+
+# Table members used by ped speech have yet another integral width; keep these
+# two calls explicitly on the int32 overload as well.
 pedchat = root / 'src' / 'peds' / 'PedChat.cpp'
 patch(
     pedchat,
