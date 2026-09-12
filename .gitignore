@@ -1,0 +1,14 @@
+# Generated upstream reconstruction
+work/
+
+# Local build output
+artifacts/
+*.elf
+*.prx
+*.map
+
+# PSPSDK smoke-test output
+ci/psp-smoke/EBOOT.PBP
+ci/psp-smoke/*.elf
+ci/psp-smoke/*.prx
+ci/psp-smoke/*.o
