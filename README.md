@@ -1,30 +1,71 @@
-# redch3psp
+# GTA III PSP — redch3psp
 
-Reconstruction and continuation of the experimental GTA III/re3 PSP port.
+Experimental GTA III / re3 port and reconstruction work for Sony PSP.
 
-Current known-good milestone from build 9Y:
-- RenderWare PSP initialization completes.
-- GTA data files and TXDs load.
-- PED.IFP loads 236 vanilla animations.
-- Streaming reaches the first real game frame.
-- Intro/cutscene begins.
-- Remaining blockers: PSP renderer color packing, corrupted geometry/skinning during the intro, and an invalid-memory-access crash after the chase cutscene begins.
+> **This repository does not include GTA III game assets.** You must provide your own legally obtained GTA III PC data files.
 
-## Project goal
+## Current milestone — HW24G FAT MEMORY
 
-Produce a reproducible PSP build from source instead of continuing with isolated EBOOT binaries. Every meaningful fix should be committed separately so regressions can be bisected and reverted.
+Snapshot date: **2026-09-12**
 
-## Upstream reference
+The current tested EBOOT identifies itself as:
 
-The reconstruction is based on the public SugaryHull/re3 tree plus the behavior and diagnostics recovered from the 9Y PSP build.
+`GTA III PSP HW24G FAT MEMORY`
 
-## Immediate priorities
+### Compatibility
 
-1. Reconstruct PSP platform/bootstrap code.
-2. Reconstruct native PSP I/O used by the known-good build.
-3. Reconstruct the PSP RenderWare backend.
-4. Fix RGBA/ABGR color packing.
-5. Validate vertex layout/stride/index handling.
-6. Validate skinned ped/cutscene rendering.
-7. Instrument and fix the crash immediately after `S110 persecucion cinematica inicia`.
-8. Optimize for real PSP hardware only after correctness is restored.
+| Target | Current status |
+| --- | --- |
+| **PPSSPP / PSP emulator** | ✅ Playable in current project testing |
+| **Real PSP hardware** | ❌ Not yet stable — the console powers off when the game begins the loading process |
+
+The important distinction is that the current build is now usable in the emulator, but **it is not yet a real-PSP release**. The next major target is finding the hardware-only shutdown during loading.
+
+### Current EBOOT identity
+
+- File: `EBOOT.PBP`
+- Size: `3,972,948 bytes`
+- SHA-256: `253b3cf1b17c999649269f0ce1b0f84b70721fd1d36283e647268e7854f3ecc2`
+- Internal title: `GTA III PSP HW24G FAT MEMORY`
+
+See [`CURRENT_BUILD.md`](CURRENT_BUILD.md) for the exact status and test notes.
+
+## Running the port
+
+Use a folder such as:
+
+```text
+PSP/GAME/GTA3PSP/
+├── EBOOT.PBP
+├── DATA/
+└── MODELS/
+```
+
+Keep the original GTA III directory/file names expected by the port. Development testing has specifically used the game's `DATA` and `MODELS` content, including `DATA/GTA3.DAT` and the original model/archive files.
+
+Only the port executable and project code belong in this repository. Rockstar game data is not redistributed here.
+
+## Building / developing
+
+This repository keeps the reproducible source-reconstruction and PSPSDK tooling instead of treating old isolated binaries as source code.
+
+Read [`BUILDING.md`](BUILDING.md) before compiling.
+
+In short:
+
+1. Install Git, Python 3 and the PSPDEV/PSPSDK toolchain (or use the `pspdev/pspdev` container used by GitHub Actions).
+2. Reconstruct the pinned upstream tree with `tools/bootstrap-upstream.sh` on Linux/macOS or `tools/bootstrap-upstream.ps1` on Windows.
+3. Use `ci/psp-smoke` to verify that your PSPSDK can produce a valid PSP `EBOOT.PBP`.
+4. The exact **HW24G FAT MEMORY** executable cannot yet be reproduced byte-for-byte from this public repository because its complete current PSP backend/build target is not present here. Do not confuse the reconstruction tooling with an exact-source release of HW24G.
+
+That missing exact-build path is now documented explicitly rather than hidden behind old milestone notes.
+
+## Project lineage
+
+The reconstruction work is based on the public `SugaryHull/re3` tree pinned by the bootstrap scripts, plus PSP-specific work and diagnostics developed for this project.
+
+## Current priority
+
+**Make the emulator-playable HW24G build survive the same loading sequence on real PSP hardware.**
+
+Until that is fixed, PPSSPP is the primary reproducible test target and real PSP testing is the hardware validation target.
