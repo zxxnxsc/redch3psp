@@ -60,3 +60,36 @@ replace_once(
 
 path.write_text(text, encoding='utf-8')
 print(f'[redch3psp] reconstructed source edits applied to {path}')
+
+# PSPSDK's stdint typedefs resolve int32_t/uint32_t to long/unsigned long on
+# this toolchain. re3 mixes its int32 aliases with plain int pointers and
+# return types, relying on the original 32-bit ABI where those spellings are
+# type-compatible. Keep the PSP build explicitly on int/unsigned int so the
+# source matches that ABI instead of sprinkling unsafe casts throughout GTA.
+common_path = root / 'src' / 'core' / 'common.h'
+common = common_path.read_text(encoding='utf-8')
+old_types = '''#ifndef __MWERKS__
+typedef uint32_t uint32;
+typedef int32_t int32;
+#else
+typedef unsigned int uint32;
+typedef int int32;
+#endif
+'''
+new_types = '''#if defined(PSP) || defined(PSP_PORT)
+typedef unsigned int uint32;
+typedef int int32;
+#elif !defined __MWERKS__
+typedef uint32_t uint32;
+typedef int32_t int32;
+#else
+typedef unsigned int uint32;
+typedef int int32;
+#endif
+'''
+count = common.count(old_types)
+if count != 1:
+    raise SystemExit(f'PSP 32-bit ABI typedefs: expected exactly one match, found {count}')
+common = common.replace(old_types, new_types, 1)
+common_path.write_text(common, encoding='utf-8')
+print(f'[redch3psp] PSP 32-bit ABI typedefs applied to {common_path}')

@@ -15,6 +15,7 @@ git -C "$WORK" checkout --quiet "$UPSTREAM_COMMIT"
 
 echo "[redch3psp] applying deterministic reconstruction edits"
 python3 "$ROOT/tools/apply_reconstruction.py" "$WORK"
+python3 "$ROOT/tools/apply_psp_backend.py" "$WORK"
 
 echo "[redch3psp] reconstruction tree ready: $WORK"
 echo "[redch3psp] upstream commit: $UPSTREAM_COMMIT"
